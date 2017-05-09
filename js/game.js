@@ -50,7 +50,6 @@ function create() {
     player.anchor.set(0.5);
     game.camera.follow(player);
     player.body.collideWorldBounds = true;
-    player.alpha = 0;
 
     //other players (buddy) 
     buddys = game.add.group();                      //buddys represent the other connected players

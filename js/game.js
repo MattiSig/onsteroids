@@ -31,7 +31,7 @@ var buddydistancetimer;
 var bullet;
 var bullets;
 var bulletTime = 0;
-var noddin;
+
 
 function create() {
     game.stage.disableVisibilityChange = true;
@@ -42,7 +42,6 @@ function create() {
     game.add.tileSprite(0,0,3000,3000, 'space');
     
     //player
-    noddin = game.add.sprite(60, 300, 'ship');
     player = game.add.sprite(32, 400, 'ship');
     game.physics.arcade.enable(player);
     player.body.drag.set(50);
@@ -188,6 +187,7 @@ function update() {
     
     if (game.input.keyboard.isDown(Phaser.Keyboard.SPACEBAR)) {
         mybull = true;
+        fireBullet(player);
     } else {
         mybull = false;
     }

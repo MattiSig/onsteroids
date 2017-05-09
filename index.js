@@ -37,8 +37,7 @@ io.on('connection', function(socket){                   //socket.io on connectio
     }
 
     communicateJoin("+");                               //someone joins on io.on('connection', ...
-    s
-    
+        
     setInterval(function () {                           //send out the list of connected sockets to all sockets
         if (usercount > 0) {
             socket.emit('userhashmap', userhashmap);

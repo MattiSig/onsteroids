@@ -81,13 +81,6 @@ var startTime;
 socket.on('userhashmap', function(msg){             //receive other player's info
     userhashmap = msg;                              //put the other player's info into userhashmap
 });
-setInterval(function() {
-    startTime = Date.now();
-    socket.emit('ping');
-},3000);
-socket.on('pong', function() {
-    console.log(Date.now() - startTime);
-});
 
 socket.on('connect', function() {
     console.log("hello " + socket.id);

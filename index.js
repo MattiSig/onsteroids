@@ -37,21 +37,14 @@ io.on('connection', function(socket){                   //socket.io on connectio
     }
 
     communicateJoin("+");                               //someone joins on io.on('connection', ...
-    
-    var startTime;
+    s
     
     setInterval(function () {                           //send out the list of connected sockets to all sockets
         if (usercount > 0) {
             socket.emit('userhashmap', userhashmap);
         }
-        startTime =Date.now();
-        socket.emit("ping");
+
     }, 65);
-    //every 100 ms
-    socket.on("pong", function(){
-       var latency = Date.now - startTime;
-       console.log(latency)
-    });
     socket.on('disconnect', function() {                //someone leaves on socket.on('disconnect', ...
 
         communicateJoin("-");
@@ -61,11 +54,6 @@ io.on('connection', function(socket){                   //socket.io on connectio
 
         userhashmap[socket.id] = msg;                   //and put it in userhashmap associated with their socket id
 
-    });
-    socket.on('ping', function() {
-        
-        socket.emit('pong');
-    
     });
 });
 

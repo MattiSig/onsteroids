@@ -31,6 +31,7 @@ var buddydistancetimer;
 var bullet;
 var bullets;
 var bulletTime = 0;
+var imAlive = true;
 
 
 function create() {
@@ -60,7 +61,7 @@ function create() {
 
     userText = game.add.text(16, 16, 'users: 1', {fontSize: '32px', fill: '#16718F'});  //displays num users online
     loginText = game.add.text(200, 16, '', {fontSize: '32px', fill: '#36718F'});      //displays user join and leave
-    
+
     //  Our ships bullets
     bullets = game.add.group();
     bullets.enableBody = true;
@@ -89,10 +90,10 @@ socket.on('connect', function() {
     setInterval(function() {                        //send info about your character to the server
         //if-else if for only sending data if the character has moved
         if (!(socket.id in userhashmap)) {
-            socket.emit('clientinfo', [myx, myy, myrot, mybull]);
+            socket.emit('clientinfo', [myx, myy, myrot, mybull, imAlive]);
         }
         else if (userhashmap[socket.id][0] != myy || userhashmap[socket.id][1] != myx || userhashmap[socket.id][2] != myrot) {
-            socket.emit('clientinfo', [myx, myy, myrot, mybull]);
+            socket.emit('clientinfo', [myx, myy, myrot, mybull, imAlive]);
         }
         
     }, 65);                                       //every 65 ms EDIT
@@ -116,7 +117,9 @@ function update() {
                     if(userhashmap[guy.name][3]){
                         fireBullet(guy);
                     }
-                    
+                    if(!userhashmap[guy.name][4]){
+                        guy.kill();                 //drepaóvin ÞARF AÐ EYÐA
+                    }
                     //above: interpolate the guy's position to the current one
                     //below: checks if a guy gets too far away from where hes supposed to be and deals with it.
                     if (game.physics.arcade.distanceToXY(guy,userhashmap[guy.name][0],userhashmap[guy.name][1]) > 60) { //arbitrary 60 can be fiddled with
@@ -137,6 +140,12 @@ function update() {
                 
                 loginText.text = user.substr(0,5) + '.. joined'; //first time creating a buddy so user just joined
             }
+        } else {            //if user is you
+            buddys.forEach(function (guy){
+                if(guy.name == user) {
+
+                }
+            })
         }
     }
     userText.text = 'users: ' + userscount; //update displayed ammount of 
@@ -192,7 +201,7 @@ function update() {
         mybull = false;
     }
     //console.log(userhashmap);
-    game.physics.arcade.overlap(bullets, buddys, collisionHandler, null, this);
+    game.physics.arcade.overlap(bullets, player, collisionHandler, null, this);
     
 }
 
@@ -221,12 +230,13 @@ function velocityFromRotationVelo (rotation, speed, point) {
     return point.setTo(player.body.velocity.x + (Math.cos(rotation) * speed), player.body.velocity.y + (Math.sin(rotation) * speed));
 }
 
-function collisionHandler (bullet, buddy) {
+function collisionHandler (player, bullet) {
     
-    buddy.kill();
+    player.kill();
+    imAlive = false;
 
 }
 
 function render() {
-	game.debug.text(game.time.fps, 2, 14, "#00ff00");
+	game.debug.text(game.time.fps, 50, 50, "#ffffff");
 }

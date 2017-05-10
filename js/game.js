@@ -202,11 +202,13 @@ function fireBullet (guy) {
         bullet = bullets.getFirstExists(false);
 
         if (bullet) {
-            bullet.reset(guy.body.x + 50, guy.body.y + 50);
+            console.log(guy.rotation);
+            bullet.reset(guy.x + (Math.cos(guy.rotation)*25), guy.y + (Math.sin(guy.rotation)*25));
             bullet.lifespan = 700;
             bullet.rotation = guy.rotation;
             game.physics.arcade.velocityFromRotation(guy.rotation, 400, bullet.body.velocity);
             bulletTime = game.time.now + 50;
+            console.log(Math.cos(guy.rotation), Math.sin(guy.rotation));
         }
     }
 }

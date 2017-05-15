@@ -43,7 +43,7 @@ io.on('connection', function(socket){                   //socket.io on connectio
             socket.emit('userhashmap', userhashmap);
         }
 
-    }, 65);
+    }, 100);
     socket.on('disconnect', function() {                //someone leaves on socket.on('disconnect', ...
 
         communicateJoin("-");

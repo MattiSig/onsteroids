@@ -248,6 +248,6 @@ function collisionHandler (player, bullet) {
 }
 
 function render() {
-    game.debug.body(player);
+    //game.debug.body(player);
     game.debug.text(game.time.fps, 2, 14, "#00ff00");
 }

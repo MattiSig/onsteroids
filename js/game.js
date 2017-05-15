@@ -46,7 +46,7 @@ function create() {
     game.add.tileSprite(0,0,3000,3000, 'space');
     
     //player
-    player = game.add.sprite(32, 400, 'ship');
+    player = game.add.sprite(Math.floor((Math.random() * 2900) + 50), Math.floor((Math.random() * 2900) + 50), 'ship');
     game.physics.arcade.enable(player);
     player.body.drag.set(50);
     player.body.maxVelocity.set(300);

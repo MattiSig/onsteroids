@@ -4,7 +4,8 @@ var http = require('http').Server(app);
 var io = require('socket.io')(http);
 
 var usercount = 0;
-var userhashmap = {};                                   //stores client information
+var userhashmap = {};    
+var oldUserHasH = {};                               //stores client information
 var port = process.env.PORT || 8080;                    //heroku port or default port 3000
 
 app.get('/', function(req, res){                        //response handler
@@ -50,9 +51,13 @@ io.on('connection', function(socket){                   //socket.io on connectio
 
     });
     socket.on('clientinfo', function(msg) {             //recieve info about the socket, i.e. their x, y, animation
+        //console.log(msg);
 
         userhashmap[socket.id] = msg;                   //and put it in userhashmap associated with their socket id
 
+    });
+    socket.on('bord', function() {
+        socket.emit('tennis');
     });
 });
 

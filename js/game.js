@@ -2,7 +2,15 @@
 /*global Phaser*/
 /*global io*/
 var game = new Phaser.Game(800, 600, Phaser.CANVAS, '', { preload: preload, create: create, update: update, render: render });
-var socket = io();                                          //initialise socket connection
+var socket = io();                                         //initialise socket connection
+
+WebFontConfig = {
+    active: function() { game.time.events.add(Phaser.Timer.SECOND, createText, this); },
+    google: {
+      families: ['Share Tech Mono']
+    }
+};
+
 
 function preload() {                                        //preload our images
     game.load.image('sky', 'assets/sky.png');
@@ -13,6 +21,8 @@ function preload() {                                        //preload our images
     game.load.image('ship', 'assets/ship.png');
     game.load.image('clown', 'assets/clown.png');
 
+    game.load.script('webfont', '//ajax.googleapis.com/ajax/libs/webfont/1.4.7/webfont.js');
+
     game.time.advancedTiming = true;
     game.state.disableVisibilityChange = true;
 }
@@ -20,7 +30,7 @@ function preload() {                                        //preload our images
 var platforms;          //these variables are explained inline
 var player;
 var cursors; 
-var userscount = 0;
+var userscount = 0;  
 var userText;
 var loginText = '';
 var buddys;
@@ -36,6 +46,10 @@ var bullets;
 var bulletTime = 0;
 var imAlive = true;
 
+var stateText;
+var deadCounter = 11;
+var canRestart;
+
 
 function create() {
     game.stage.disableVisibilityChange = true;
@@ -46,10 +60,10 @@ function create() {
     game.add.tileSprite(0,0,3000,3000, 'space');
     
     //player
-    player = game.add.sprite(Math.floor((Math.random() * 2900) + 50), Math.floor((Math.random() * 2900) + 50), 'ship');
+    player = game.add.sprite(100, 100, 'ship');
     game.physics.arcade.enable(player);
     player.body.drag.set(50);
-    player.body.maxVelocity.set(300);
+    player.body.maxVelocity.set(300); 
     player.anchor.set(0.5);
     game.camera.follow(player);
     player.body.collideWorldBounds = true;
@@ -76,13 +90,36 @@ function create() {
     bullets.setAll('anchor.x', 0.5);
     bullets.setAll('anchor.y', 0.5);
     
-    
+    //-----TEXT-----
+
 }
 
+function createText()
+{
+    stateText = game.add.text(400, 300, "A");
+    stateText.anchor.setTo(0.5);
+
+    stateText.font = 'Share Tech Mono';
+    stateText.fontSize = 30;
+    stateText.align = 'center';
+    stateText.fixedToCamera = true;
+    stateText.fill = '#ffffff';
+    stateText.alpha = 0;
+}
 //socket.io
 
 var startTime;
 var updateUsers;
+
+setInterval(function() {
+  startTime = Date.now();
+  socket.emit('bord');
+}, 2000);
+
+socket.on('tennis', function() {
+  latency = Date.now() - startTime;
+  console.log(latency);
+});
 
 socket.on('userhashmap', function(msg){             //receive other player's info
     userhashmap = msg;                             //put the other player's info into userhashmap
@@ -98,14 +135,24 @@ socket.on('connect', function() {
         if (!(socket.id in userhashmap)) {
             socket.emit('clientinfo', [myx, myy, myrot, mybull, imAlive]);
         }
-        else if (userhashmap[socket.id][0] != myy || userhashmap[socket.id][1] != myx || userhashmap[socket.id][2] != myrot) {
+        else if (userhashmap[socket.id][0] != myy || userhashmap[socket.id][1] != myx 
+            || userhashmap[socket.id][2] != myrot || userhashmap[socket.id][3] != mybull
+            || userhashmap[socket.id][4] != imAlive) {
             socket.emit('clientinfo', [myx, myy, myrot, mybull, imAlive]);
-        }
+        } 
     }, 100);                                       //every 65 ms EDIT
 });
+function rotateToPos(radNow, radTarg, ms){
+    var radDistance =  radTarg - radNow;
+    
+    return ((radDistance / game.time.physicsElapsed) * (1000/ms));  
+
+}
 
 function update() {
     //buddy control
+    //Phaser.time.physicsElapsed = 1/game.time.fps;
+
     if(updateUsers){
         userscount = 0;
         for(var user in userhashmap) {                  //iterate through all connected players
@@ -116,34 +163,39 @@ function update() {
                     if (guy.name == user) {             //if a guy (individual buddy) has already been created
                         //***manipulating buddys already present in room***
                         nobuddy = false;                //a buddy has already been created for this user
-
-                        game.physics.arcade.moveToXY(guy,userhashmap[guy.name][0],userhashmap[guy.name][1], 0, 100);
-                        guy.rotation = userhashmap[guy.name][2];
                         
+                        game.physics.arcade.moveToXY(guy,userhashmap[guy.name][0],userhashmap[guy.name][1], 0, 100);
+                        
+                        guy.body.angularVelocity = 0;
+                        guy.rotation = guy.oldRot;
+                        guy.body.angularVelocity = rotateToPos(guy.rotation, userhashmap[guy.name][2], 100);
+
+                        guy.oldRot = userhashmap[guy.name][2];
+
                         if(userhashmap[guy.name][3]){
                             fireBullet(guy);
                         }
                         if(!userhashmap[guy.name][4]){
-                            guy.kill();                 //drepaóvin ÞARF AÐ EYÐA .destroya
+                            guy.destroy();                 //drepaóvin ÞARF AÐ EYÐA .destroya
                         }
                         //above: interpolate the guy's position to the current one
                         //below: checks if a guy gets too far away from where hes supposed to be and deals with it.
-                        if (game.physics.arcade.distanceToXY(guy,userhashmap[guy.name][0],userhashmap[guy.name][1]) > 60) { //arbitrary 60 can be fiddled with
+                        /*if (game.physics.arcade.distanceToXY(guy,userhashmap[guy.name][0],userhashmap[guy.name][1]) > 60) { //arbitrary 60 can be fiddled with
                             buddydistancetimer += 1;
                             if (buddydistancetimer > 10) { //arbitrary 10 can be fiddled with
                                 guy.body.position.x = userhashmap[guy.name][0]; //snaps to non-interpolated position
                                 guy.body.position.y = userhashmap[guy.name][1]; //if too far away from it
                             }
-                        } else buddydistancetimer = 0;
+                        } else buddydistancetimer = 0;*/
 
                     }
                 },this);
-                if (nobuddy) {  //no buddy has been created for this user, so create one
+                if (nobuddy && userhashmap[user][4] && user != socketid) {  //no buddy has been created for this user, so create one
                     var buddy = buddys.create(userhashmap[user][0], userhashmap[user][1], 'ship');  //create buddy
                     //buddy.tint = '0x' + (Math.round(Math.random()*Math.pow(2, 24))).toString(16);   //random color
                     buddy.name = user;                                //identify the buddy with it's corresponding user
                     buddy.anchor.set(0.5);
-                    
+                    buddy.oldRot = 0;
                     loginText.text = user.substr(0,5) + '.. joined'; //first time creating a buddy so user just joined
                 }
             } else {            //if user is you
@@ -169,10 +221,6 @@ function update() {
             loginText.text = guy.name.substr(0,5) + '.. left';  //tell the player that the user left the game
         }
     });
-
-    if(updateUsers){
-        console.log("mhm");   
-    }
 
 
     game.physics.arcade.collide(player, platforms);
@@ -205,9 +253,15 @@ function update() {
         player.body.angularVelocity = 0;
     }
     
-    if (game.input.keyboard.isDown(Phaser.Keyboard.SPACEBAR)) {
+    if (game.input.keyboard.isDown(Phaser.Keyboard.SPACEBAR) && imAlive) {
         mybull = true;
         fireBullet(player);
+    } else if (game.input.keyboard.isDown(Phaser.Keyboard.SPACEBAR) && canRestart){
+        
+        stateText.alpha = 0;
+        deadCounter = 11;
+        revivePlayer();
+
     } else {
         mybull = false;
     }
@@ -240,11 +294,29 @@ function velocityFromRotationVelo (rotation, speed, point) {
     return point.setTo(player.body.velocity.x + (Math.cos(rotation) * speed), player.body.velocity.y + (Math.sin(rotation) * speed));
 }
 
+var loopDeadCounter;
 function collisionHandler (player, bullet) {
 
     player.kill();
     imAlive = false;
+    stateText.alpha = 1;
+    loopDeadCounter = game.time.events.loop(Phaser.Timer.SECOND, updateCounter, this);
 
+}
+
+function updateCounter() {
+    deadCounter--;
+    stateText.setText("You dead ! \n press space to restart in " + deadCounter + "sec");
+    
+    if(deadCounter <= 0){
+        canRestart = true;
+        game.time.events.remove(loopDeadCounter);
+    }
+}
+
+function revivePlayer() {
+    player.reset( Math.floor((Math.random() * 2900) + 50), Math.floor((Math.random() * 2900) + 50))
+    imAlive = true;
 }
 
 function render() {

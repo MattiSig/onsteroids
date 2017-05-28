@@ -2,10 +2,12 @@ var express = require('express');
 var app = express();
 var http = require('http').Server(app);
 var io = require('socket.io')(http);
+//var phaser = require('./js/phaser.min.js')
 
 var usercount = 0;
 var userhashmap = {};    
-var oldUserHasH = {};                               //stores client information
+var oldUserHash = [];
+var scoreboard = {statusMessage: " "};                                   //stores client information
 var port = process.env.PORT || 8080;                    //heroku port or default port 3000
 
 app.get('/', function(req, res){                        //response handler
@@ -25,9 +27,12 @@ io.on('connection', function(socket){                   //socket.io on connectio
         if (status == '+') {                            //status just checks if you want the function to handle a join
                                                         //or a leave
             usercount += 1;                             //if a user joins add 1 to the usercount
+            scoreboard[socket.id] = [0, 0]; //[kills, death]
+            socket.emit("scoreboard", scoreboard)
         } else if (status == '-') {
             usercount -= 1;
             delete userhashmap[socket.id];              //get rid of the info of the logged in socket when they leave
+            delete scoreboard[socket.id];
         }
         console.log(status + socket.id);
         console.log("users: " + usercount);
@@ -45,20 +50,35 @@ io.on('connection', function(socket){                   //socket.io on connectio
         }
 
     }, 100);
+
     socket.on('disconnect', function() {                //someone leaves on socket.on('disconnect', ...
 
         communicateJoin("-");
 
     });
     socket.on('clientinfo', function(msg) {             //recieve info about the socket, i.e. their x, y, animation
-        //console.log(msg);
-
+        if(typeof userhashmap[socket.id] !== 'undefined'){
+            oldUserHash = userhashmap[socket.id];
+            
+                var tempDistance = Math.sqrt(Math.pow(oldUserHash[0] - msg[0], 2) + Math.pow(oldUserHash[1] - msg[1],2));
+                if(tempDistance > 50 && oldUserHash[4] !=false){
+                    msg[4] = false;
+                    console.log("cheater");
+                }   
+        }
         userhashmap[socket.id] = msg;                   //and put it in userhashmap associated with their socket id
-
+        if(msg[5] !== "0" && msg[5] !== oldUserHash[5]){
+            userhashmap[msg[5]][4] = false;
+            scoreboard[socket.id][0] += 1;
+            scoreboard[msg[5]][1] += 1;
+            console.log(scoreboard);
+            socket.emit('scoreboard', scoreboard);
+        }
     });
     socket.on('bord', function() {
         socket.emit('tennis');
     });
+
 });
 
 

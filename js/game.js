@@ -1,9 +1,16 @@
+/* 
+Höfundur: Matthías Sigurbjörnsson,  2017
+e-Mail: mattisigur@gmail.com
 
-/*global Phaser*/
-/*global io*/
+based on some of the code from
+https://github.com/vezwork/phasocketonline/blob/master/index.js
+*/
+/*  global Phaser
+    global io*/
 var game = new Phaser.Game(800, 600, Phaser.CANVAS, '', { preload: preload, create: create, update: update, render: render });
 var socket = io();                                         //initialise socket connection
 
+//loads up a google font used for stateText
 WebFontConfig = {
     active: function() { game.time.events.add(Phaser.Timer.SECOND, createText, this); },
     google: {
@@ -11,15 +18,11 @@ WebFontConfig = {
     }
 };
 
-
+//called by phaser.game to preload sprite and assets
 function preload() {                                        //preload our images
-    game.load.image('sky', 'assets/sky.png');
-    game.load.image('ground', 'assets/platform.png');
-    game.load.spritesheet('dude', 'assets/dude.png', 32, 48);
     game.load.image('space', 'assets/deep-space.jpg');
     game.load.image('bullet', 'assets/bullets.png');
     game.load.image('ship', 'assets/ship.png');
-    game.load.image('clown', 'assets/clown.png');
 
     game.load.script('webfont', '//ajax.googleapis.com/ajax/libs/webfont/1.4.7/webfont.js');
 
@@ -31,20 +34,18 @@ function preload() {                                        //preload our images
 
 }
 
-var platforms;          //these variables are explained inline
 var player;
 var cursors; 
 var userscount = 0;  
 var userText;
 var loginText = '';
-var buddys;
+var enemies;
 var myx;
 var myy;
 var imShooting = false;
 var myrot;
 var userhashmap = {};
 var socketid;
-var buddydistancetimer;
 var bullet;
 var bullets;
 var bulletTime = 0;
@@ -58,6 +59,7 @@ var deadCounter = 11;
 var canRestart;
 
 
+//create is called by the phaser.game class and creates the objects the game will work with
 function create() {
     game.stage.disableVisibilityChange = true;
         
@@ -76,27 +78,22 @@ function create() {
     player.body.collideWorldBounds = true;
     player.enableBody = true;
 
-    //other players (buddy) 
-    buddys = game.add.group();                      //buddys represent the other connected players
-    buddys.enableBody = true;
-    buddys.setAll('anchor.x', 0.5);
-    buddys.setAll('anchor.y', 0.5);
+    //other players (enemies) 
+    enemies = game.add.group();         
+    enemies.enableBody = true;
+    enemies.setAll('anchor.x', 0.5);
+    enemies.setAll('anchor.y', 0.5);
 
-    cursors = game.input.keyboard.createCursorKeys();
-
-    userText = game.add.text(16, 16, 'users: 1', {fontSize: '32px', fill: '#16718F'});  //displays num users online
-    loginText = game.add.text(200, 16, '', {fontSize: '32px', fill: '#36718F'});      //displays user join and leave
-
-    //  Our ships bullets
+    // Our bullets
     myBullets = game.add.group();
     myBullets.enableBody = true;
     myBullets.physicsBodyType = Phaser.Physics.ARCADE;
 
-    //  All 40 of them
     myBullets.createMultiple(4, 'bullet');
     myBullets.setAll('anchor.x', 0.5);
     myBullets.setAll('anchor.y', 0.5);
-        
+    
+    //enemy bullets
     enemyBull = game.add.group();
     enemyBull.enableBody = true;
     enemyBull.physicsBodyType = Phaser.Physics.ARCADE;
@@ -104,7 +101,15 @@ function create() {
     enemyBull.createMultiple(40, 'bullet');
     enemyBull.setAll('anchor.x', 0.5);
     enemyBull.setAll('anchor.y', 0.5);
+    
+    //input cursor
+    cursors = game.input.keyboard.createCursorKeys();
 
+    //text objects
+    userText = game.add.text(16, 550, 'users: 1', {fontSize: '32px', fill: '#16718F'}); 
+    loginText = game.add.text(200, 550, '', {fontSize: '32px', fill: '#36718F'}); 
+    userText.fixedToCamera = true;
+    loginText.fixedToCamera = true;
     scoreText = game.add.text(400, 300, scoreBoard);
     scoreText.anchor.setTo(0.5);
     scoreText.fontSize = 14;
@@ -126,30 +131,34 @@ function createText()
     stateText.fixedToCamera = true;
     stateText.fill = '#ffffff';
     stateText.alpha = 0;
-
-
 }
-//socket.io
-
+////////////////////
+//   socket.io    //
+////////////////////
 var startTimePing;
 var latency;
 var updateUsers;
 
+//every 2 seconds call the bord "function" from server 
+//and start a timer
 setInterval(function() {
   startTimePing = Date.now();
   socket.emit('bord');
 }, 2000);
 
+//recive call from server and document how long it took
+//to get a recsponse. This calculates ping
 socket.on('tennis', function() {
   latency = Date.now() - startTimePing;
-  //console.log(latency);
 });
 
-socket.on('userhashmap', function(msg){             //receive other player's info
-    userhashmap = msg;                             //put the other player's info into userhashmap
+//recive other players info and give userhashmap the value
+socket.on('userhashmap', function(msg){   
+    userhashmap = msg;      
     updateUsers = true;
 });
 
+//recieve scorebord info and give scoreBoard its valur
 socket.on('scoreboard', function(msg){
     scoreBoard = "User \t kills \t deaths \n";
     var msgArray = Object.keys(msg);
@@ -161,30 +170,37 @@ socket.on('scoreboard', function(msg){
 
 var startTimeUser;
 var shotTime = [];
+//establish socket.io connection with the server
 socket.on('connect', function() {
     console.log("hello " + socket.id);
-    socketid = socket.id;                           //store socket.id for use in the game
-
+    socketid = socket.id;                     
+    //send out array of data about my player to server
+    //every 100 ms
     setInterval(function() {
-        //send info about your character to the server
-        //if-else if for only sending data if the character has moved
+
         if (!(socketid in userhashmap)) {
             socket.emit('clientinfo', [myx, myy, myrot, imShooting, imAlive, iKilled]);
 
         }
+        //send only if my status has changed
         else if (userhashmap[socket.id][0] != myx || userhashmap[socket.id][1] != myy 
             || userhashmap[socket.id][2] != myrot || userhashmap[socket.id][3] != imShooting
             || userhashmap[socket.id][4] != imAlive || userhashmap[socket.id][5] !== iKilled) {
             socket.emit('clientinfo', [myx, myy, myrot, imShooting, imAlive, iKilled]);   
         }
-        //
-        //iKilled = "0";
+
         imShooting = false;
         shotTime = [];
         startTimeUser = Date.now();
     }, 100); 
                                          //every 65 ms EDIT
 });
+
+//use:      rotateToPos(number,number,number)
+//input - (number) radNow, (number) radTarg, (nnumber) ms
+//function: calculates radial distance to turn each frame to end up in 
+//          target radian(radTarg) from current radion (radNow) in given milliseconds
+//returns:  (number)
 function rotateToPos(radNow, radTarg, ms){
     var radDistance =  radTarg - radNow;
     if(radDistance < -Math.PI){
@@ -194,23 +210,24 @@ function rotateToPos(radNow, radTarg, ms){
     }
     
     return ((radDistance / game.time.physicsElapsed) * (1000/ms));  
-
 }
 
+//main game loop, called by phaser.game to update each frame in the game
+//manipulates objects within the game to simulate movement and events
 function update() {
-    //buddy control
-    //Phaser.time.physicsElapsed = 1/game.time.fps;
 
     if(updateUsers){
         userscount = 0;
-        for(var user in userhashmap) {                  //iterate through all connected players
+        
+        for(var user in userhashmap) {
             userscount += 1;
-            var nobuddy = true;                         //flag for if a buddy has been created for this user already
-            if (user != socketid) {                     //if the connected user isn't you
-                buddys.forEach(function (guy) {         //iterate through current representations of players
-                    if (guy.name == user) {             //if a guy (individual buddy) has already been created
-                        //***manipulating buddys already present in room***
-                        nobuddy = false;                //a buddy has already been created for this user
+            var noenemy = true;           
+            
+            if (user != socketid) {         
+                enemies.forEach(function (guy) {  
+                    
+                    if (guy.name == user) {          
+                        noenemy = false;                
                         
                         game.physics.arcade.moveToXY(guy,userhashmap[guy.name][0],userhashmap[guy.name][1], 0, 100);
                         
@@ -229,56 +246,45 @@ function update() {
 
                     }
                 },this);
-                if (nobuddy && userhashmap[user][4] && user != socketid) {  //no buddy has been created for this user, so create one
-                    var buddy = buddys.create(userhashmap[user][0], userhashmap[user][1], 'ship');  //create buddy
-                    //buddy.tint = '0x' + (Math.round(Math.random()*Math.pow(2, 24))).toString(16);   //random color
-                    buddy.name = user;                                //identify the buddy with it's corresponding user
-                    buddy.anchor.set(0.5);
-                    buddy.oldRot = 0;
-                    loginText.text = user.substr(0,5) + '.. joined'; //first time creating a buddy so user just joined
+                
+                if (noenemy && userhashmap[user][4] && user != socketid) {  //no enemy has been created for this user, so create one
+                    var enemy = enemies.create(userhashmap[user][0], userhashmap[user][1], 'ship');  //create enemy
+                    //enemy.tint = '0x' + (Math.round(Math.random()*Math.pow(2, 24))).toString(16);   //random color
+                    enemy.name = user;                                //identify the enemy with it's corresponding user
+                    enemy.anchor.set(0.5);
+                    enemy.oldRot = 0;
+                    loginText.text = user.substr(0,5) + '.. joined'; //first time creating a enemy so user just joined
                 }
-            } else {            //if user is you
-                buddys.forEach(function (guy){
-                    if(guy.name == user) {}
-                });
             }
         }
+        
         if(socketid in userhashmap){
+            
             if(userhashmap[socketid][4]==false){
                 killPlayer();
             }
         }
     }
-    userText.text = 'users: ' + userscount; //update displayed ammount of 
-    //destroy buddies if they are not in the hashmap (the user left the game)
-    buddys.forEach(function (guy) { //iterate through all buddys
+    userText.text = 'users: ' + userscount;
+   
+    enemies.forEach(function (guy) { 
         var nouser = true;
         for(var user in userhashmap) {
-            if (guy.name == user) { //if the buddy represents a documented user
-                nouser = false;     //then make sure he is not destroyed
+            if (guy.name == user) { 
+                nouser = false; 
             }
         }
-        if (nouser) {               //if the user is gone from the hashmap but the buddy still exists
-            guy.destroy();          //destroy that buddy
-            loginText.text = guy.name.substr(0,5) + '.. left';  //tell the player that the user left the game
+        if (nouser) {       
+            guy.destroy(); 
+            loginText.text = guy.name.substr(0,5) + '.. left';
         }
     });
-
-
-    game.physics.arcade.collide(player, platforms);
-
-    game.physics.arcade.collide(buddys, platforms);
-    
-    game.physics.arcade.collide(buddys);
-    
-    //player.body.velo
-    
+        
     myx = player.x;
     myy = player.y;
     myrot = player.rotation;
     
-    //player.rotation = game.physics.arcade.moveToPointer(player, 60, game.input.activePointer, 500);
-
+    //input form user
     if (cursors.up.isDown) {
         game.physics.arcade.accelerationFromRotation(player.rotation, 200, player.body.acceleration);
     } else {
@@ -311,12 +317,16 @@ function update() {
     } else {
         scoreText.alpha = 0;
     }
-    //console.log(userhashmap);
-    game.physics.arcade.overlap(myBullets, buddys, collisionHandler, null, this);
+
+    game.physics.arcade.overlap(myBullets, enemies, collisionHandler, null, this);
 
     updateUsers = false;
 }
 
+//use: fireBullet(object, boolean)
+//input: (object) guy, (boolean) isMine
+//function: renders bullet from right position and angle of guy
+//          checks if guy is enemy or player
 function fireBullet (guy, isMine) {
     
     if (isMine && game.time.now > bulletTime) {
@@ -345,23 +355,19 @@ function fireBullet (guy, isMine) {
     }
 }
 
-/*function velocityFromRotationVelo (rotation, speed, point) {
+//use: collisionHandler(object, object)
+//function: determains what happens when objects collide
+function collisionHandler (myBullet, enemy) {
 
-    if (speed === undefined) { speed = 60; }
-    point = point || new Phaser.Point();
-
-    return point.setTo(player.body.velocity.x + (Math.cos(rotation) * speed), player.body.velocity.y + (Math.sin(rotation) * speed));
-}*/
-
-function collisionHandler (myBullet, buddy) {
-
-    if(iKilled !== buddy.name){
-        iKilled = buddy.name;
+    if(iKilled !== enemy.name){
+        iKilled = enemy.name;
         game.time.events.add(Phaser.Timer.SECOND * 0.3, clearIKilled, this);
     }
 }
 
 var loopDeadCounter;
+//use: killPlayer()
+//function: kills the palyer and start counter
 function killPlayer(){
     if(player.alive){
         player.kill();
@@ -371,10 +377,13 @@ function killPlayer(){
     }    
 }
 
+//use: updateCounter()
+//funciotn: updates counter
 function updateCounter() {
     deadCounter--;
-    stateText.setText("You dead ! \n press space to restart in " + deadCounter + "sec");
-    
+    if(typeof stateText !== 'undefined'){ 
+        stateText.setText("You dead ! \n press space to restart in " + deadCounter + "sec");
+    }
     if(deadCounter <= 0){
         canRestart = true;
         game.time.events.remove(loopDeadCounter);
@@ -391,8 +400,6 @@ function clearIKilled(){
 }
 
 function render() {
-    //game.debug.body(player);
     game.debug.text("fps: " + game.time.fps, 2, 14, "#00ff00");
     game.debug.text("ping: " + latency, 2, 32, "#00ff00");
-    game.debug.text( player.rotation, 2, 50, "#00ff00");
 }

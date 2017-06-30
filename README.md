@@ -1,2 +1,2 @@
 # onsteroids
-online asteroids game
+Multiplayer online asteroids game
